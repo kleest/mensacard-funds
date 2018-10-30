@@ -6,9 +6,7 @@
 #include <freefare.h>
 
 int main(int argc, char *argv[]) {
-    int error = EXIT_SUCCESS;
     nfc_device *device = NULL;
-
     nfc_connstring devices[1];
     size_t device_count;
 
@@ -23,10 +21,8 @@ int main(int argc, char *argv[]) {
         errx(EXIT_FAILURE, "No NFC device found.");
 
     device = nfc_open(context, devices[0]);
-    if (!device) {
-        warnx("nfc_open() failed.");
-        error = EXIT_FAILURE;
-    }
+    if (!device)
+        errx(EXIT_FAILURE, "nfc_open() failed.");
 
     // scan for target tags in a loop
     FreefareTag tag;
@@ -51,49 +47,45 @@ int main(int argc, char *argv[]) {
         usleep(100000);
     } while (tag == NULL);
 
-    if (!error) {
-        if (MIFARE_DESFIRE != freefare_get_tag_type(tag))
-            errx(EXIT_FAILURE, "No DESFire card");
+    if (MIFARE_DESFIRE != freefare_get_tag_type(tag))
+        errx(EXIT_FAILURE, "No DESFire card");
 
-        // print card UID
-        char *tag_uid = freefare_get_tag_uid(tag);
-        printf("Found %s with UID %s.\n", freefare_get_tag_friendly_name(tag), tag_uid);
+    // print card UID
+    char *tag_uid = freefare_get_tag_uid(tag);
+    printf("Found %s with UID %s.\n", freefare_get_tag_friendly_name(tag), tag_uid);
 
-        // connect using DESFire
-        int res = mifare_desfire_connect(tag);
-        if (res < 0)
-            errx(EXIT_FAILURE, "Can't connect to Mifare DESFire target.");
+    // connect using DESFire
+    int res = mifare_desfire_connect(tag);
+    if (res < 0)
+        errx(EXIT_FAILURE, "Can't connect to Mifare DESFire target.");
 
-        // Mifare DESFire SelectApplication
-        MifareDESFireAID aid = mifare_desfire_aid_new(0x15845F);
+    // Mifare DESFire SelectApplication
+    MifareDESFireAID aid = mifare_desfire_aid_new(0x15845F);
 
-        res = mifare_desfire_select_application(tag, aid);
-        if (res < 0)
-            errx(EXIT_FAILURE, "Application selection failed: %d", res);
+    res = mifare_desfire_select_application(tag, aid);
+    if (res < 0)
+        errx(EXIT_FAILURE, "Application selection failed: %d", res);
 
-        // query and display the current funds
-        int val;
-        res = mifare_desfire_get_value(tag, 1, &val);
-        if (res < 0)
-            errx(EXIT_FAILURE, "Reading value of fileno 1 failed: %d", res);
-        printf("Current funds:\t\t\t %.2f €\n", val/1000.0f);
+    // query and display the current funds
+    int val;
+    res = mifare_desfire_get_value(tag, 1, &val);
+    if (res < 0)
+        errx(EXIT_FAILURE, "Reading value of fileno 1 failed: %d", res);
+    printf("Current funds:\t\t\t %.2f €\n", val/1000.0f);
 
-        // query and display last transaction valuta
-        struct mifare_desfire_file_settings settings;
-        res = mifare_desfire_get_file_settings(tag, 1, &settings);
-        if (res < 0)
-            errx(EXIT_FAILURE, "Reading file settings of fileno 1 failed: %d", res);
-        printf("Last transaction:\t\t %.2f €\n", settings.settings.value_file.limited_credit_value/1000.0f);
-
-        // cleanup
-        free(aid);
-        mifare_desfire_disconnect(tag);
-        free(tag_uid);
-    }
+    // query and display last transaction valuta
+    struct mifare_desfire_file_settings settings;
+    res = mifare_desfire_get_file_settings(tag, 1, &settings);
+    if (res < 0)
+        errx(EXIT_FAILURE, "Reading file settings of fileno 1 failed: %d", res);
+    printf("Last transaction:\t\t %.2f €\n", settings.settings.value_file.limited_credit_value/1000.0f);
 
     // cleanup
+    free(aid);
+    mifare_desfire_disconnect(tag);
+    free(tag_uid);
     nfc_close(device);
     nfc_exit(context);
 
-    exit(error);
+    exit(EXIT_SUCCESS);
 }
